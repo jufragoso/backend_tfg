@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7">
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8">
 		<attributes>
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
@@ -11,7 +11,10 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="/Users/jlfdr/Documents/TFG/Proyecto Base/libs/jawjaw-1.0.2.jar"/>
-	<classpathentry kind="lib" path="/Users/jlfdr/Documents/TFG/Proyecto Base/libs/ws4j-1.0.1.jar"/>
+	<classpathentry kind="lib" path="/Users/jlfdr/Documents/jars/commons-lang-2.6.jar"/>
+	<classpathentry kind="lib" path="/Users/jlfdr/Documents/jars/jawjaw-0.1.0.jar"/>
+	<classpathentry kind="lib" path="/Users/jlfdr/Documents/jars/sqlite-jdbc-3.20.1.jar"/>
+	<classpathentry kind="lib" path="/Users/jlfdr/Documents/jars/ws4j-0.1.0.jar"/>
+	<classpathentry kind="lib" path="/Users/jlfdr/Documents/jars/string-similarity-1.0.0.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

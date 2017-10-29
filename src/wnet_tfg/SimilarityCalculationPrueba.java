@@ -10,7 +10,10 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 import edu.cmu.lti.lexical_db.ILexicalDatabase;
 import edu.cmu.lti.lexical_db.NictWordNet;
@@ -458,7 +461,7 @@ public class SimilarityCalculationPrueba {
 	public void select() {
 		ResultSet result = null;
 		try {
-			PreparedStatement st = conn.prepareStatement("select name  from sqlite_master where type = 'table'");
+			PreparedStatement st = conn.prepareStatement("select name  from sqlite_master where type = 'view'");
 			result = st.executeQuery();
 			while (result.next()) {
 				System.out.print("name: ");
@@ -606,46 +609,68 @@ public class SimilarityCalculationPrueba {
 	}
 
 	public void crearVistas() {
-		ResultSet result = null;
-		try {
-			
-			//String query1 ="SELECT name FROM sqlite_master WHERE type='view' ORDER BY name;"; 
-					
-			PreparedStatement st = conn.prepareStatement("select name  from sqlite_master where type = 'view'");
-			result = st.executeQuery();
-			while (result.next()) {
-//				System.out.print("name: ");
-//				System.out.println(result.getString("name"));
-				
-//				if(result.getString("name").equals("repository_useful_data_for_indicators")){
-//					
-//					PreparedStatement st1 = conn.prepareStatement("drop view repository_useful_data_for_indicators");
-//					
-//					st1.executeQuery();
-//					
-////					if(borrada){
-////						System.err.println("BORRADA");
-////					}else{
-////						System.err.println("NO BORRADA");
-////					}
-//					
-//					
-//					//System.err.println("ENCONTRADA");
-//				}
-				
 
+		String[] arrayVistas = { "repository_useful_data_for_indicators",
+				"datasets_categorized_referenced_and_distinct_repository_id_referencing",
+				"datasets_categorized_not_referenced", "categories_total_references", "categories_total_datasets_in",
+				"categories_total_datasets_no_referenced", "categories_total_datasets_referenced",
+				"categories_total_repositories_referencing", "categories_contributors", "categories_contributions",
+				"categories_subscribers", "categories_madurity_total" };
+
+		// borrarVistas
+
+		for (int i = 0; i < arrayVistas.length; i++) {
+			borrarVistas(arrayVistas[i]);
+		}
+
+		// borrarVistas(arrayVistas[0]);
+		System.out.println("VISTAS BORRADAS");
+		// crear vistas
+
+		repository_useful_data_for_indicators();
+		datasets_categorized_referenced_and_distinct_repository_id_referencing();
+		datasets_categorized_not_referenced();
+		categories_total_references();
+		categories_total_datasets_in();
+		categories_total_datasets_no_referenced();
+		categories_total_datasets_referenced();
+		categories_total_repositories_referencing();
+		categories_contributors();
+		categories_contributions();
+		categories_subscribers();
+		categories_madurity_total();
+
+		System.out.println("VISTAS CREADAS");
+	}
+
+	private void borrarVistas(String nameView) {
+		ResultSet result = null;
+
+		try {
+			PreparedStatement st = conn.prepareStatement(
+					"select name from sqlite_master where type = 'view' and name = '" + nameView + "'");
+			result = st.executeQuery();
+			// entra si existe la view
+			if (result.next()) {
+				Statement stmtDelete = conn.createStatement();
+				String sqlDelete = "drop view if exists " + nameView;
+				stmtDelete.executeUpdate(sqlDelete);
 			}
-//			
-//			ResultSet rs = preparedStatement.executeQuery(selectSQL );
-//			PreparedStatement pstmt = conn.prepareStatement(
-//					"create view repository_useful_data_for_indicators as select distinct repository_id,total_contributors,total_contributions,subscribers_count,created_at,updated_at from measures_repository where  created_at!='' order by repository_id");
-//			
-//			boolean exito = pstmt.execute();
-//			if(exito){
-//				System.out.println("Vista creada correctamente");
-//			}else{
-//				System.out.println("Vista NO CREADA");
-//			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+
+	private void repository_useful_data_for_indicators() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view repository_useful_data_for_indicators as "
+					+ "select distinct repository_id,total_contributors,total_contributions,subscribers_count,created_at,updated_at"
+					+ " from measures_repository where  created_at!='' order by repository_id";
+			stmtCreate.executeUpdate(sqlCreate);
 
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
@@ -653,18 +678,395 @@ public class SimilarityCalculationPrueba {
 		}
 	}
 
+	private void datasets_categorized_referenced_and_distinct_repository_id_referencing() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view datasets_categorized_referenced_and_distinct_repository_id_referencing as "
+					+ "select distinct c.identifier,c.category,d.repository_id"
+					+ " from results_search_open_data as d  join usa_city_datasets_categorized as c on (d.identifier=c.identifier)"
+					+ " where repository_id in (select repository_id from repository_useful_data_for_indicators)"
+					+ " order by c.category,c.identifier,d.repository_id";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void datasets_categorized_not_referenced() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view datasets_categorized_not_referenced as"
+					+ "select distinct identifier,category,NULL as repository_id from usa_city_datasets_categorized"
+					+ " where identifier not in"
+					+ "(select identifier from datasets_categorized_referenced_and_distinct_repository_id_referencing)"
+					+ " order by category,identifier";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_total_references() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_total_references"
+					+ " as select category,count (*) as total_references"
+					+ " from datasets_categorized_referenced_and_distinct_repository_id_referencing"
+					+ " group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	// CREATE INDEX index_view1 ON categories_total_references(category)
+
+	private void categories_total_datasets_in() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_total_datasets_in as"
+					+ " select category,count (distinct identifier) total_datasets_in_category"
+					+ " from usa_city_datasets_categorized group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_total_datasets_no_referenced() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_total_datasets_no_referenced as select category,count (distinct identifier) as total_datasets_no_referenced from datasets_categorized_not_referenced group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_total_datasets_referenced() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_total_datasets_referenced as"+
+					" select category,count (distinct identifier) as total_datasets_referenced"+
+					" from datasets_categorized_referenced_and_distinct_repository_id_referencing"+
+					"group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_total_repositories_referencing() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_total_repositories_referencing as"
+					+ " select category,count (distinct repository_id) as total_repositories_referencing"
+					+ " from datasets_categorized_referenced_and_distinct_repository_id_referencing"
+					+ "group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_contributors() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_contributors as"
+					+ " select category,sum(total_contributors) as contributors"
+					+ " from (select distinct d.repository_id,r.total_contributors,d.category"
+					+ " from repository_useful_data_for_indicators as r join"
+					+ " datasets_categorized_referenced_and_distinct_repository_id_referencing as d on d.repository_id=r.repository_id"
+					+ " order by d.repository_id,r.total_contributors,d.category) group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_contributions() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_contributions as"
+					+ " select category, sum(total_contributions) as contributions from"
+					+ " (select distinct d.repository_id,r.total_contributions,d.category"
+					+ " from repository_useful_data_for_indicators as r join"
+					+ " datasets_categorized_referenced_and_distinct_repository_id_referencing as d on d.repository_id=r.repository_id"
+					+ " order by d.repository_id,r.total_contributions,d.category) group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_subscribers() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_subscribers as"
+					+ " select category, sum(subscribers_count) as subscribers from"
+					+ " (select distinct d.repository_id,r.subscribers_count,d.category"
+					+ " from repository_useful_data_for_indicators as r join"
+					+ " datasets_categorized_referenced_and_distinct_repository_id_referencing as d on d.repository_id=r.repository_id"
+					+ " order by d.repository_id,r.subscribers_count,d.category) group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void categories_madurity_total() {
+		try {
+
+			Statement stmtCreate = conn.createStatement();
+			String sqlCreate = "create view categories_madurity_total as"
+					+" select category, round(sum( (strftime('%s','2015-11-24 19:19:39 ')-strftime('%s',created_at))/((strftime('%s','2015-11-24 19:19:39 ')-strftime('%s',updated_at))*1.0)),3) as madurity_total"
+					+" from (select distinct d.repository_id,r.created_at,r.updated_at,d.category from repository_useful_data_for_indicators as r join datasets_categorized_referenced_and_distinct_repository_id_referencing as d on d.repository_id=r.repository_id order by d.repository_id,r.created_at,r.updated_at,d.category) group by category order by category";
+
+			stmtCreate.executeUpdate(sqlCreate);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public int[][] calculateFirstMatrix() {
+
+		int[][] matrix = new int[14][5];
+
+		ResultSet result = null;
+
+		try {
+
+			// CREATE INDEX ON categories_total_references(category)
+			PreparedStatement st1, st2, st3, st4, st5;
+			st1 = conn.prepareStatement("select * from categories_total_references");
+			result = st1.executeQuery();
+			int i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("category").equals("Others")) {
+					matrix[i][0] = result.getInt("total_references");
+					i++;
+				}
+			}
+
+			System.out.println("Fin consulta 1");
+
+			st2 = conn.prepareStatement("select * from categories_total_datasets_in");
+
+			result = st2.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				String categoria = result.getString("CATEGORY");
+				System.out.println("Categoria procesada --" + categoria);
+				if (!categoria.equals("Others")) {
+
+					matrix[i][1] = result.getInt("total_datasets_in_category");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 2");
+			st3 = conn.prepareStatement("select * from categories_total_datasets_no_referenced");
+
+			result = st3.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("CATEGORY").equals("Others")) {
+					matrix[i][2] = result.getInt("total_datasets_no_referenced");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 3");
+			st4 = conn.prepareStatement("select * from categories_total_datasets_referenced");
+
+			result = st4.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("CATEGORY").equals("Others")) {
+					matrix[i][3] = result.getInt("total_datasets_referenced");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 4");
+			st5 = conn.prepareStatement("select * from categories_total_repositories_referencing");
+
+			result = st5.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("CATEGORY").equals("Others")) {
+					matrix[i][4] = result.getInt("total_repositories_referencing");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 5");
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return matrix;
+	}
+
+	public int[][] calculateSecondMatrix() {
+
+		int[][] matrix = new int[14][5];
+
+		ResultSet result = null;
+
+		try {
+
+			// CREATE INDEX ON categories_total_references(category)
+			PreparedStatement st1, st2, st3, st4, st5;
+			st1 = conn.prepareStatement("select * from categories_contributors");
+			result = st1.executeQuery();
+			int i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("category").equals("Others")) {
+					matrix[i][0] = result.getInt("contributors");
+					i++;
+				}
+			}
+
+			System.out.println("Fin consulta 1");
+
+			st2 = conn.prepareStatement("select * from categories_contributions");
+
+			result = st2.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				String categoria = result.getString("category");
+				if (!categoria.equals("Others")) {
+
+					matrix[i][1] = result.getInt("contributions");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 2");
+			st3 = conn.prepareStatement("select * from categories_subscribers");
+
+			result = st3.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("category").equals("Others")) {
+					matrix[i][2] = result.getInt("subscribers");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 3");
+
+			st4 = conn.prepareStatement("select * from categories_madurity_total");
+
+			result = st4.executeQuery();
+			i = 0;
+			// entra si existe la view
+			while (result.next()) {
+				if (!result.getString("category").equals("Others")) {
+					matrix[i][4] = result.getInt("madurity_total");
+					i++;
+				}
+			}
+			System.out.println("Fin consulta 4");
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return matrix;
+	}
+
 	public static void main(String[] args) {
-		// procesar();
+
+		long startTime = System.currentTimeMillis();
+
+		Date dateInicio = new Date(startTime);
+		System.out.println("Inicio - " + dateInicio);
 
 		SimilarityCalculationPrueba s = new SimilarityCalculationPrueba();
 
+		s.disconnect();
+
 		s.connect();
 
-		s.procesar();
+		// s.procesar();
 
 		s.crearVistas();
 
+		int[][] matrix = s.calculateFirstMatrix();
+
+		System.out.println("Matriz 1");
+		System.out.println();
+		for (int i = 0; i < matrix.length; i++) {
+			for (int j = 0; j < matrix[i].length; j++) {
+				System.out.print(matrix[i][j] + " - ");
+			}
+			System.out.println();
+		}
+
+		int[][] matrix2 = s.calculateSecondMatrix();
+		System.out.println();
+		System.out.println("Matriz 2");
+		System.out.println();
+		for (int i = 0; i < matrix2.length; i++) {
+			for (int j = 0; j < matrix2[i].length; j++) {
+				System.out.print(matrix2[i][j] + " - ");
+			}
+			System.out.println();
+		}
+
 		s.disconnect();
+
+		long stopTime = System.currentTimeMillis();
+
+		Date dateFinal = new Date(stopTime);
+		System.out.println("Final - " + dateFinal);
 
 		// similitudMensaje("Transportation","Transport & Infrastructure");
 	}
